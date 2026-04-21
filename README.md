@@ -157,14 +157,10 @@ Fill this section after experiments.
 
 ## Authors and Contributions
 
-Replace placeholders before submission.
 
-| Team Member | Role |
-|---|---|
-| Name 1 | Project lead, experiment design, report writing |
-| Name 2 | LSTM baseline implementation and tuning |
-| Name 3 | Transformer fine-tuning and evaluation |
-| Name 4 | Error analysis, clinical interpretation, presentation |
+| Team Member | Role | Tasks |
+| Bryan Quiala Llera| Project lead | Coordination, Abstract, Introduction, & Literature Review |
+| Jai Raccioppi | Baseline engineer | Establish framework, Methods, Results, & Discussion |
 
 ## Dependencies
 
