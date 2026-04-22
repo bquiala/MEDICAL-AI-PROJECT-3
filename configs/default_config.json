@@ -3,6 +3,7 @@
   "dataset": {
     "name": "armanc/pubmed-rct20k",
     "text_column": "text",
+    "label_column": "label",
     "task": "named_entity_recognition",
     "entity_types": [
       "DISEASE",
@@ -35,6 +36,29 @@
     "weight_decay": 0.01,
     "warmup_ratio": 0.1,
     "class_weighting": false
+  },
+  "classification": {
+    "lstm": {
+      "vocab_size": 50000,
+      "embedding_dim": 200,
+      "hidden_dim": 256,
+      "num_layers": 1,
+      "dropout": 0.2,
+      "batch_size": 128,
+      "num_epochs": 5,
+      "learning_rate": 0.001,
+      "max_seq_len": 128,
+      "class_weighting": true
+    },
+    "transformer": {
+      "model_name": "distilbert-base-uncased",
+      "batch_size": 16,
+      "num_epochs": 3,
+      "learning_rate": 2e-5,
+      "max_seq_len": 128,
+      "weight_decay": 0.01,
+      "warmup_ratio": 0.1
+    }
   },
   "runtime": {
     "num_workers": 2,

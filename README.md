@@ -1,18 +1,20 @@
 # MEDICAL-AI-PROJECT-3
 
-Biomedical Named Entity Recognition (NER) using PubMed RCT 20k text with a BiLSTM baseline and a pretrained transformer token classifier.
+Biomedical NLP project on PubMed RCT 20k with two tracks:
+1) weakly supervised Named Entity Recognition (NER), and
+2) sentence-level rhetorical role classification.
 
 ## Clinical Context
 
-This project is intended for biomedical NLP learners and clinical research teams who need structured extraction of clinically relevant entities from medical text. The task identifies entities such as diseases, drugs, procedures, and anatomy mentions in token sequences, supporting evidence mining and downstream clinical NLP pipelines.
+This project is intended for biomedical NLP learners and clinical research teams who need both sentence-level evidence structuring and token-level entity extraction from biomedical text.
 
-## Task and Dataset
+## Tasks and Dataset
 
-- Task: Named Entity Recognition (BIO token tagging)
 - Dataset: PubMed RCT 20k
 - Source: https://huggingface.co/datasets/armanc/pubmed-rct20k
 - Splits: Predefined train, validation, and test
-- Note: This repository uses weak supervision to create biomedical NER tags from domain lexicons.
+- Task A (NER): weakly supervised BIO tagging for DISEASE, DRUG, PROCEDURE, ANATOMY
+- Task B (Classification): sentence role classification (Background/Objective/Methods/Results/Conclusions)
 
 ## Quick Start
 
@@ -41,8 +43,8 @@ bash scripts/run_quick_pipeline.sh
 
 Expected outcome:
 - Creates run artifacts under `artifacts/`
-- Trains both models on a subset
-- Generates token/entity metrics and span predictions
+- Trains all quick-run models on a subset
+- Generates NER metrics, classification metrics, predictions, and report figures
 
 ### 4. Run full pipeline
 
@@ -57,7 +59,7 @@ Expected runtime and compute:
 
 ## Usage Guide
 
-### Train LSTM baseline
+### NER: Train LSTM baseline
 
 ```bash
 python -m medical_ai_project.cli.train_lstm --config configs/default_config.json
@@ -78,6 +80,28 @@ Output:
 - `artifacts/transformer/checkpoints/`
 - `artifacts/transformer/metrics/`
 - `artifacts/transformer/predictions/`
+
+### Classification: Train LSTM baseline
+
+```bash
+python -m medical_ai_project.cli.train_lstm_cls --config configs/default_config.json
+```
+
+Output:
+- `artifacts/classification_lstm/checkpoints/`
+- `artifacts/classification_lstm/metrics/`
+- `artifacts/classification_lstm/predictions/`
+
+### Classification: Train transformer model
+
+```bash
+python -m medical_ai_project.cli.train_transformer_cls --config configs/default_config.json
+```
+
+Output:
+- `artifacts/classification_transformer/checkpoints/`
+- `artifacts/classification_transformer/metrics/`
+- `artifacts/classification_transformer/predictions/`
 
 ### Evaluate model predictions
 
@@ -104,11 +128,27 @@ Output:
 - Hard example slices
 - Frequent failure modes summary
 
+### Generate report figures from artifacts
+
+```bash
+python -m medical_ai_project.cli.make_report_figures \
+	--artifacts-root artifacts \
+	--output-dir reports/figures
+```
+
+Output:
+- `reports/figures/figure_1_model_comparison.png`
+- `reports/figures/figure_2_ner_entity_f1.png`
+- `reports/figures/figure_3_transformer_confusion_matrix.png`
+- `reports/figures/figure_4_confidence_vs_correctness.png`
+- summary CSVs used in the report
+
 ## Data Description
 
 - Source: Hugging Face Datasets (armanc/pubmed-rct20k)
-- Structure: sentence-level text converted into token-level weak BIO tags
-- Fields used: text column transformed into tokens and BIO labels
+- Text field: `text`
+- Classification label field: `label`
+- NER labels: generated weak BIO tags from lexicon matching
 - License and citation: follow the dataset card and original paper references on Hugging Face
 - Data access: automatically downloaded via `datasets` package at runtime
 
@@ -118,16 +158,25 @@ If your environment is offline, pre-download and cache Hugging Face datasets bef
 
 Fill this section after experiments.
 
+### NER (weak supervision)
+
 | Model | Token Accuracy | Entity Precision | Entity Recall | Entity F1 |
 |---|---:|---:|---:|---:|
 | LSTM baseline | TBD | TBD | TBD | TBD |
 | Transformer | TBD | TBD | TBD | TBD |
 
+### Sentence Classification (gold labels)
+
+| Model | Accuracy | Macro F1 | Weighted F1 |
+|---|---:|---:|---:|
+| LSTM baseline | TBD | TBD | TBD |
+| Transformer | TBD | TBD | TBD |
+
 ### Notes on model behavior
 
-- Overfitting checks: compare train vs validation loss and entity F1.
+- Overfitting checks: compare train vs validation metrics in both tasks.
 - Label quality checks: weak supervision quality depends on lexicon coverage.
-- Error patterns: inspect missed and spurious entities by type.
+- Error patterns: inspect NER missed/spurious entities and classification confusion matrix.
 
 ## Project Structure
 

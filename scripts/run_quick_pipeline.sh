@@ -19,14 +19,21 @@ cfg["dataset"]["max_validation_samples"] = 1000
 cfg["dataset"]["max_test_samples"] = 1000
 cfg["lstm"]["num_epochs"] = 1
 cfg["transformer"]["num_epochs"] = 1
+cfg["classification"]["lstm"]["num_epochs"] = 1
+cfg["classification"]["transformer"]["num_epochs"] = 1
 
 quick_path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
 PY
 
 python -m medical_ai_project.cli.train_lstm --config "$TMP_CONFIG"
 python -m medical_ai_project.cli.train_transformer --config "$TMP_CONFIG"
+python -m medical_ai_project.cli.train_lstm_cls --config "$TMP_CONFIG"
+python -m medical_ai_project.cli.train_transformer_cls --config "$TMP_CONFIG"
 python -m medical_ai_project.cli.error_analysis \
   --predictions artifacts/transformer/predictions/test_predictions.csv \
   --output-dir artifacts/transformer/analysis
+python -m medical_ai_project.cli.make_report_figures \
+  --artifacts-root artifacts \
+  --output-dir reports/figures
 
 rm -f "$TMP_CONFIG"

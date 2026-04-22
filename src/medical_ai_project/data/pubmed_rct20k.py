@@ -241,6 +241,28 @@ class LSTMSentenceDataset(Dataset):
         )
 
 
+class LSTMTextClassificationDataset(Dataset):
+    """Torch dataset for sentence-level text classification."""
+
+    def __init__(self, texts: list[str], labels: list[int], vocab: Vocab, max_seq_len: int) -> None:
+        self.texts = texts
+        self.labels = labels
+        self.vocab = vocab
+        self.max_seq_len = max_seq_len
+
+    def __len__(self) -> int:
+        return len(self.texts)
+
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        token_ids = encode_sentence(self.texts[index], self.vocab, self.max_seq_len)
+        attention_mask = [1 if token_id != self.vocab.pad_id else 0 for token_id in token_ids]
+        return (
+            torch.tensor(token_ids, dtype=torch.long),
+            torch.tensor(self.labels[index], dtype=torch.long),
+            torch.tensor(attention_mask, dtype=torch.long),
+        )
+
+
 def create_lstm_dataloaders(
     config: dict,
     dataset: datasets.DatasetDict,
@@ -296,3 +318,69 @@ def class_weights_from_labels(labels: list[int], num_classes: int, ignore_index:
     weights = 1.0 / counts
     weights = weights / weights.sum() * num_classes
     return torch.tensor(weights, dtype=torch.float)
+
+
+def make_sentence_label_maps(dataset: datasets.DatasetDict, label_column: str) -> tuple[dict[str, int], dict[int, str]]:
+    """Build label maps for sentence classification task."""
+    train_features = dataset["train"].features
+    if label_column in train_features and hasattr(train_features[label_column], "names"):
+        names = list(train_features[label_column].names)
+        label2id = {label: idx for idx, label in enumerate(names)}
+        id2label = {idx: label for label, idx in label2id.items()}
+        return label2id, id2label
+
+    observed_labels = sorted({str(label) for label in dataset["train"][label_column]})
+    label2id = {label: idx for idx, label in enumerate(observed_labels)}
+    id2label = {idx: label for label, idx in label2id.items()}
+    return label2id, id2label
+
+
+def create_lstm_classification_dataloaders(
+    config: dict,
+    dataset: datasets.DatasetDict,
+) -> tuple[dict, Vocab, dict[str, int], dict[int, str], list[int]]:
+    """Create sentence-classification dataloaders for the LSTM baseline."""
+    ds_cfg = config["dataset"]
+    cls_cfg = config["classification"]["lstm"]
+    runtime_cfg = config["runtime"]
+    text_column = ds_cfg["text_column"]
+    label_column = ds_cfg.get("label_column", "label")
+
+    label2id, id2label = make_sentence_label_maps(dataset, label_column)
+
+    train_texts = list(dataset["train"][text_column])
+    val_texts = list(dataset["validation"][text_column])
+    test_texts = list(dataset["test"][text_column])
+
+    def normalize_labels(values: list) -> list[int]:
+        normalized = []
+        for value in values:
+            if isinstance(value, str):
+                normalized.append(label2id[value])
+            else:
+                normalized.append(int(value))
+        return normalized
+
+    train_labels = normalize_labels(list(dataset["train"][label_column]))
+    val_labels = normalize_labels(list(dataset["validation"][label_column]))
+    test_labels = normalize_labels(list(dataset["test"][label_column]))
+
+    vocab = build_vocab(train_texts, vocab_size=cls_cfg["vocab_size"])
+
+    data = {
+        "train": LSTMTextClassificationDataset(train_texts, train_labels, vocab, cls_cfg["max_seq_len"]),
+        "validation": LSTMTextClassificationDataset(val_texts, val_labels, vocab, cls_cfg["max_seq_len"]),
+        "test": LSTMTextClassificationDataset(test_texts, test_labels, vocab, cls_cfg["max_seq_len"]),
+    }
+
+    loaders = {
+        split: DataLoader(
+            ds,
+            batch_size=cls_cfg["batch_size"],
+            shuffle=(split == "train"),
+            num_workers=runtime_cfg["num_workers"],
+        )
+        for split, ds in data.items()
+    }
+
+    return loaders, vocab, label2id, id2label, train_labels

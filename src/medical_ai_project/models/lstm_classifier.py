@@ -41,3 +41,49 @@ class LSTMClassifier(nn.Module):
         output, _ = self.lstm(embeddings)
         logits = self.classifier(self.dropout(output))
         return logits
+
+
+class LSTMSentenceClassifier(nn.Module):
+    """Embedding + BiLSTM + masked mean pooling for sentence classification."""
+
+    def __init__(
+        self,
+        vocab_size: int,
+        embedding_dim: int,
+        hidden_dim: int,
+        num_layers: int,
+        dropout: float,
+        num_classes: int,
+        pad_id: int,
+    ) -> None:
+        super().__init__()
+        self.embedding = nn.Embedding(
+            num_embeddings=vocab_size,
+            embedding_dim=embedding_dim,
+            padding_idx=pad_id,
+        )
+        self.lstm = nn.LSTM(
+            input_size=embedding_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=True,
+            dropout=dropout if num_layers > 1 else 0.0,
+        )
+        self.dropout = nn.Dropout(dropout)
+        self.classifier = nn.Linear(hidden_dim * 2, num_classes)
+
+    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor | None = None) -> torch.Tensor:
+        embeddings = self.embedding(input_ids)
+        output, _ = self.lstm(embeddings)
+
+        if attention_mask is None:
+            pooled = output.mean(dim=1)
+        else:
+            mask = attention_mask.unsqueeze(-1).float()
+            summed = (output * mask).sum(dim=1)
+            denom = mask.sum(dim=1).clamp(min=1.0)
+            pooled = summed / denom
+
+        logits = self.classifier(self.dropout(pooled))
+        return logits

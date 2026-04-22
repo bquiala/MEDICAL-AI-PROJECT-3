@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+import numpy as np
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    precision_recall_fscore_support,
+)
+
 def bio_tags_to_spans(tags: list[str]) -> list[dict]:
     """Convert BIO tags into entity spans with start/end token offsets."""
     spans: list[dict] = []
@@ -119,3 +127,111 @@ def make_span_level_report(y_true_tags: list[list[str]], y_pred_tags: list[list[
         }
 
     return report
+
+
+def compute_classification_metrics(
+    y_true: list[int],
+    y_pred: list[int],
+    label_names: list[str] | None = None,
+) -> dict:
+    """Compute sentence classification metrics and optional per-class report."""
+    precision_macro, recall_macro, f1_macro, _ = precision_recall_fscore_support(
+        y_true,
+        y_pred,
+        average="macro",
+        zero_division=0,
+    )
+    precision_weighted, recall_weighted, f1_weighted, _ = precision_recall_fscore_support(
+        y_true,
+        y_pred,
+        average="weighted",
+        zero_division=0,
+    )
+
+    report = {
+        "accuracy": float(accuracy_score(y_true, y_pred)),
+        "precision_macro": float(precision_macro),
+        "recall_macro": float(recall_macro),
+        "f1_macro": float(f1_macro),
+        "precision_weighted": float(precision_weighted),
+        "recall_weighted": float(recall_weighted),
+        "f1_weighted": float(f1_weighted),
+    }
+
+    if label_names is not None:
+        precision_per, recall_per, f1_per, support_per = precision_recall_fscore_support(
+            y_true,
+            y_pred,
+            labels=list(range(len(label_names))),
+            average=None,
+            zero_division=0,
+        )
+        report["per_class"] = {
+            label_names[idx]: {
+                "precision": float(precision_per[idx]),
+                "recall": float(recall_per[idx]),
+                "f1": float(f1_per[idx]),
+                "support": int(support_per[idx]),
+            }
+            for idx in range(len(label_names))
+        }
+
+    return report
+
+
+def bootstrap_metric_ci(
+    y_true: list[int],
+    y_pred: list[int],
+    metric_name: str,
+    n_bootstrap: int = 1000,
+    alpha: float = 0.05,
+    seed: int = 42,
+) -> dict:
+    """Estimate bootstrap confidence interval for accuracy or macro-F1."""
+    if metric_name not in {"accuracy", "f1_macro"}:
+        raise ValueError("metric_name must be one of {'accuracy', 'f1_macro'}")
+
+    if len(y_true) != len(y_pred):
+        raise ValueError("y_true and y_pred must have equal length")
+
+    rng = np.random.default_rng(seed)
+    n = len(y_true)
+    if n == 0:
+        return {"mean": 0.0, "ci_low": 0.0, "ci_high": 0.0, "n_bootstrap": int(n_bootstrap)}
+
+    y_true_arr = np.asarray(y_true)
+    y_pred_arr = np.asarray(y_pred)
+
+    def _score(indices: np.ndarray) -> float:
+        yt = y_true_arr[indices]
+        yp = y_pred_arr[indices]
+        if metric_name == "accuracy":
+            return float(accuracy_score(yt, yp))
+        return float(f1_score(yt, yp, average="macro", zero_division=0))
+
+    scores = []
+    for _ in range(n_bootstrap):
+        indices = rng.integers(0, n, size=n)
+        scores.append(_score(indices))
+
+    scores_arr = np.asarray(scores, dtype=float)
+    low_q = float(np.quantile(scores_arr, alpha / 2.0))
+    high_q = float(np.quantile(scores_arr, 1.0 - alpha / 2.0))
+    return {
+        "mean": float(scores_arr.mean()),
+        "ci_low": low_q,
+        "ci_high": high_q,
+        "n_bootstrap": int(n_bootstrap),
+    }
+
+
+def make_confusion_matrix_table(y_true: list[int], y_pred: list[int], label_names: list[str]) -> list[dict]:
+    """Return confusion matrix rows as dictionaries for CSV/JSON export."""
+    cm = confusion_matrix(y_true, y_pred, labels=list(range(len(label_names))))
+    rows: list[dict] = []
+    for i, true_name in enumerate(label_names):
+        row = {"true_label": true_name}
+        for j, pred_name in enumerate(label_names):
+            row[pred_name] = int(cm[i, j])
+        rows.append(row)
+    return rows
