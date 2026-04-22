@@ -3,7 +3,13 @@
   "dataset": {
     "name": "armanc/pubmed-rct20k",
     "text_column": "text",
-    "label_column": "label",
+    "task": "named_entity_recognition",
+    "entity_types": [
+      "DISEASE",
+      "DRUG",
+      "PROCEDURE",
+      "ANATOMY"
+    ],
     "max_train_samples": null,
     "max_validation_samples": null,
     "max_test_samples": null

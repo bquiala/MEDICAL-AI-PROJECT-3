@@ -17,7 +17,7 @@ from medical_ai_project.utils.io_utils import save_json
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Generate qualitative error analysis")
-    parser.add_argument("--predictions", type=str, required=True, help="CSV with text, true_label, pred_label")
+    parser.add_argument("--predictions", type=str, required=True, help="CSV with tokens, true_tags, pred_tags")
     parser.add_argument("--output-dir", type=str, required=True, help="Directory for error analysis outputs")
     return parser.parse_args()
 
@@ -27,9 +27,9 @@ def main() -> None:
     args = parse_args()
     df = pd.read_csv(args.predictions)
 
-    required_columns = {"true_label", "pred_label"}
+    required_columns = {"true_tags", "pred_tags"}
     if not required_columns.issubset(df.columns):
-        raise ValueError("Prediction CSV must include true_label and pred_label columns")
+        raise ValueError("Prediction CSV must include true_tags and pred_tags columns")
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

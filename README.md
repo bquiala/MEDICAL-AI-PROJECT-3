@@ -1,21 +1,18 @@
 # MEDICAL-AI-PROJECT-3
 
-Clinical Trial Abstract Sentence Classification using PubMed RCT 20k with a required LSTM baseline and a pretrained transformer for fair comparison.
+Biomedical Named Entity Recognition (NER) using PubMed RCT 20k text with a BiLSTM baseline and a pretrained transformer token classifier.
 
 ## Clinical Context
 
-This project is intended for biomedical NLP learners and clinical research teams who need structured understanding of clinical trial abstracts. The task predicts rhetorical roles for each sentence (Background, Objective, Methods, Results, Conclusions), which can support evidence summarization, literature triage, and downstream decision-support pipelines.
+This project is intended for biomedical NLP learners and clinical research teams who need structured extraction of clinically relevant entities from medical text. The task identifies entities such as diseases, drugs, procedures, and anatomy mentions in token sequences, supporting evidence mining and downstream clinical NLP pipelines.
 
 ## Task and Dataset
 
-- Task: Multi-class sentence classification (5 labels)
+- Task: Named Entity Recognition (BIO token tagging)
 - Dataset: PubMed RCT 20k
 - Source: https://huggingface.co/datasets/armanc/pubmed-rct20k
 - Splits: Predefined train, validation, and test
-- Approximate size:
-	- Train: ~180k sentences
-	- Validation: ~30k sentences
-	- Test: ~30k sentences
+- Note: This repository uses weak supervision to create biomedical NER tags from domain lexicons.
 
 ## Quick Start
 
@@ -45,7 +42,7 @@ bash scripts/run_quick_pipeline.sh
 Expected outcome:
 - Creates run artifacts under `artifacts/`
 - Trains both models on a subset
-- Generates evaluation files and a confusion matrix
+- Generates token/entity metrics and span predictions
 
 ### 4. Run full pipeline
 
@@ -91,9 +88,9 @@ python -m medical_ai_project.cli.evaluate \
 ```
 
 Output:
-- Accuracy, Precision, Recall, F1
-- Classification report
-- Confusion matrix image
+- Token accuracy
+- Entity-level precision, recall, and F1
+- Entity-level report by type
 
 ### Run qualitative error analysis
 
@@ -110,8 +107,8 @@ Output:
 ## Data Description
 
 - Source: Hugging Face Datasets (armanc/pubmed-rct20k)
-- Structure: sentence-level text with one rhetorical label per sentence
-- Fields expected: text and label columns
+- Structure: sentence-level text converted into token-level weak BIO tags
+- Fields used: text column transformed into tokens and BIO labels
 - License and citation: follow the dataset card and original paper references on Hugging Face
 - Data access: automatically downloaded via `datasets` package at runtime
 
@@ -121,16 +118,16 @@ If your environment is offline, pre-download and cache Hugging Face datasets bef
 
 Fill this section after experiments.
 
-| Model | Accuracy | Precision (macro) | Recall (macro) | F1 (macro) |
+| Model | Token Accuracy | Entity Precision | Entity Recall | Entity F1 |
 |---|---:|---:|---:|---:|
 | LSTM baseline | TBD | TBD | TBD | TBD |
 | Transformer | TBD | TBD | TBD | TBD |
 
 ### Notes on model behavior
 
-- Overfitting checks: compare train vs validation loss curves.
-- Class imbalance checks: inspect per-class support and macro vs weighted metrics.
-- Error patterns: analyze ambiguous and long sentences, negation, and rare terms.
+- Overfitting checks: compare train vs validation loss and entity F1.
+- Label quality checks: weak supervision quality depends on lexicon coverage.
+- Error patterns: inspect missed and spurious entities by type.
 
 ## Project Structure
 

@@ -1,4 +1,4 @@
-"""LSTM baseline model for sentence classification."""
+"""BiLSTM baseline model for token-level NER."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from torch import nn
 
 
 class LSTMClassifier(nn.Module):
-    """Embedding + LSTM + linear classifier baseline."""
+    """Embedding + BiLSTM + per-token linear classifier."""
 
     def __init__(
         self,
@@ -30,14 +30,14 @@ class LSTMClassifier(nn.Module):
             hidden_size=hidden_dim,
             num_layers=num_layers,
             batch_first=True,
+            bidirectional=True,
             dropout=dropout if num_layers > 1 else 0.0,
         )
         self.dropout = nn.Dropout(dropout)
-        self.classifier = nn.Linear(hidden_dim, num_classes)
+        self.classifier = nn.Linear(hidden_dim * 2, num_classes)
 
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
         embeddings = self.embedding(input_ids)
         output, _ = self.lstm(embeddings)
-        pooled = output[:, -1, :]
-        logits = self.classifier(self.dropout(pooled))
+        logits = self.classifier(self.dropout(output))
         return logits

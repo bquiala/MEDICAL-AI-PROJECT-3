@@ -1,4 +1,4 @@
-"""Data loading and preprocessing for PubMed RCT 20k."""
+"""Data loading and weak NER preprocessing for PubMed RCT 20k."""
 
 from __future__ import annotations
 
@@ -32,6 +32,49 @@ class Vocab:
         return self.stoi[self.unk_token]
 
 
+DEFAULT_ENTITY_LEXICON = {
+    "DISEASE": [
+        "diabetes",
+        "hypertension",
+        "cancer",
+        "infection",
+        "stroke",
+        "asthma",
+        "depression",
+        "pneumonia",
+    ],
+    "DRUG": [
+        "aspirin",
+        "ibuprofen",
+        "metformin",
+        "insulin",
+        "paracetamol",
+        "acetaminophen",
+        "amoxicillin",
+        "statin",
+        "beta blocker",
+    ],
+    "PROCEDURE": [
+        "surgery",
+        "biopsy",
+        "mri",
+        "ct scan",
+        "x ray",
+        "dialysis",
+        "chemotherapy",
+        "radiotherapy",
+    ],
+    "ANATOMY": [
+        "heart",
+        "lung",
+        "liver",
+        "kidney",
+        "brain",
+        "blood",
+    ],
+}
+
+
 def simple_tokenize(text: str) -> list[str]:
     """Basic whitespace tokenizer with lowercasing.
 
@@ -42,6 +85,66 @@ def simple_tokenize(text: str) -> list[str]:
         List of tokens.
     """
     return text.lower().strip().split()
+
+
+def make_ner_labels(entity_types: list[str]) -> tuple[dict[str, int], dict[int, str]]:
+    """Create BIO label maps from configured entity types."""
+    labels = ["O"]
+    for entity_type in entity_types:
+        upper = entity_type.upper()
+        labels.extend([f"B-{upper}", f"I-{upper}"])
+
+    label2id = {label: idx for idx, label in enumerate(labels)}
+    id2label = {idx: label for label, idx in label2id.items()}
+    return label2id, id2label
+
+
+def _entity_lexicon(entity_types: list[str]) -> dict[str, list[list[str]]]:
+    """Build tokenized phrase lexicon keyed by entity type."""
+    lexicon = {}
+    for entity_type in entity_types:
+        phrases = DEFAULT_ENTITY_LEXICON.get(entity_type.upper(), [])
+        tokenized_phrases = [simple_tokenize(phrase) for phrase in phrases if phrase.strip()]
+        tokenized_phrases.sort(key=len, reverse=True)
+        lexicon[entity_type.upper()] = tokenized_phrases
+    return lexicon
+
+
+def annotate_bio_tags(tokens: list[str], entity_types: list[str]) -> list[str]:
+    """Generate weak BIO labels using a small biomedical phrase lexicon."""
+    tags = ["O"] * len(tokens)
+    lexicon = _entity_lexicon(entity_types)
+
+    for entity_type, phrase_tokens_list in lexicon.items():
+        for phrase_tokens in phrase_tokens_list:
+            span_len = len(phrase_tokens)
+            if span_len == 0 or span_len > len(tokens):
+                continue
+
+            for start in range(0, len(tokens) - span_len + 1):
+                end = start + span_len
+                if any(tag != "O" for tag in tags[start:end]):
+                    continue
+                if tokens[start:end] == phrase_tokens:
+                    tags[start] = f"B-{entity_type}"
+                    for idx in range(start + 1, end):
+                        tags[idx] = f"I-{entity_type}"
+
+    return tags
+
+
+def add_weak_ner_annotations(config: dict, dataset: datasets.DatasetDict) -> datasets.DatasetDict:
+    """Attach token and BIO-tag columns for NER training/evaluation."""
+    entity_types = config["dataset"].get("entity_types", ["DISEASE", "DRUG", "PROCEDURE", "ANATOMY"])
+    label2id, _ = make_ner_labels(entity_types)
+
+    def annotate(example: dict) -> dict:
+        tokens = simple_tokenize(example[config["dataset"]["text_column"]])
+        tags = annotate_bio_tags(tokens, entity_types)
+        tag_ids = [label2id[tag] for tag in tags]
+        return {"tokens": tokens, "ner_tags": tags, "ner_tag_ids": tag_ids}
+
+    return dataset.map(annotate)
 
 
 def load_pubmed_rct20k(config: dict) -> datasets.DatasetDict:
@@ -98,57 +201,73 @@ def encode_sentence(text: str, vocab: Vocab, max_seq_len: int) -> list[int]:
 
 
 class LSTMSentenceDataset(Dataset):
-    """Torch dataset for LSTM sentence classification."""
+    """Torch dataset for LSTM token-level NER."""
 
     def __init__(
         self,
-        texts: list[str],
-        labels: list[int],
+        token_sequences: list[list[str]],
+        tag_id_sequences: list[list[int]],
         vocab: Vocab,
         max_seq_len: int,
+        ignore_index: int,
     ) -> None:
-        self.texts = texts
-        self.labels = labels
+        self.token_sequences = token_sequences
+        self.tag_id_sequences = tag_id_sequences
         self.vocab = vocab
         self.max_seq_len = max_seq_len
+        self.ignore_index = ignore_index
 
     def __len__(self) -> int:
-        return len(self.texts)
+        return len(self.token_sequences)
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
-        token_ids = encode_sentence(
-            text=self.texts[index],
-            vocab=self.vocab,
-            max_seq_len=self.max_seq_len,
-        )
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        tokens = self.token_sequences[index]
+        tag_ids = self.tag_id_sequences[index]
+
+        token_ids = [self.vocab.stoi.get(tok, self.vocab.unk_id) for tok in tokens[: self.max_seq_len]]
+        label_ids = tag_ids[: self.max_seq_len]
+
+        attention_mask = [1] * len(token_ids)
+        if len(token_ids) < self.max_seq_len:
+            padding = self.max_seq_len - len(token_ids)
+            token_ids.extend([self.vocab.pad_id] * padding)
+            label_ids.extend([self.ignore_index] * padding)
+            attention_mask.extend([0] * padding)
+
         return (
             torch.tensor(token_ids, dtype=torch.long),
-            torch.tensor(self.labels[index], dtype=torch.long),
+            torch.tensor(label_ids, dtype=torch.long),
+            torch.tensor(attention_mask, dtype=torch.long),
         )
 
 
-def create_lstm_dataloaders(config: dict, dataset: datasets.DatasetDict) -> tuple[dict, Vocab]:
-    """Create train/val/test dataloaders and vocabulary for LSTM workflow."""
+def create_lstm_dataloaders(
+    config: dict,
+    dataset: datasets.DatasetDict,
+    ignore_index: int = -100,
+) -> tuple[dict, Vocab, dict[str, int], dict[int, str], list[int]]:
+    """Create NER token-level dataloaders, vocabulary, and label maps."""
     ds_cfg = config["dataset"]
     lstm_cfg = config["lstm"]
     runtime_cfg = config["runtime"]
 
-    text_col = ds_cfg["text_column"]
-    label_col = ds_cfg["label_column"]
+    label2id, id2label = make_ner_labels(ds_cfg.get("entity_types", ["DISEASE", "DRUG", "PROCEDURE", "ANATOMY"]))
 
-    train_texts = list(dataset["train"][text_col])
-    train_labels = list(dataset["train"][label_col])
-    val_texts = list(dataset["validation"][text_col])
-    val_labels = list(dataset["validation"][label_col])
-    test_texts = list(dataset["test"][text_col])
-    test_labels = list(dataset["test"][label_col])
+    annotated = add_weak_ner_annotations(config, dataset)
 
-    vocab = build_vocab(train_texts, vocab_size=lstm_cfg["vocab_size"])
+    train_tokens = list(annotated["train"]["tokens"])
+    train_tag_ids = list(annotated["train"]["ner_tag_ids"])
+    val_tokens = list(annotated["validation"]["tokens"])
+    val_tag_ids = list(annotated["validation"]["ner_tag_ids"])
+    test_tokens = list(annotated["test"]["tokens"])
+    test_tag_ids = list(annotated["test"]["ner_tag_ids"])
+
+    vocab = build_vocab((" ".join(tokens) for tokens in train_tokens), vocab_size=lstm_cfg["vocab_size"])
 
     data = {
-        "train": LSTMSentenceDataset(train_texts, train_labels, vocab, lstm_cfg["max_seq_len"]),
-        "validation": LSTMSentenceDataset(val_texts, val_labels, vocab, lstm_cfg["max_seq_len"]),
-        "test": LSTMSentenceDataset(test_texts, test_labels, vocab, lstm_cfg["max_seq_len"]),
+        "train": LSTMSentenceDataset(train_tokens, train_tag_ids, vocab, lstm_cfg["max_seq_len"], ignore_index),
+        "validation": LSTMSentenceDataset(val_tokens, val_tag_ids, vocab, lstm_cfg["max_seq_len"], ignore_index),
+        "test": LSTMSentenceDataset(test_tokens, test_tag_ids, vocab, lstm_cfg["max_seq_len"], ignore_index),
     }
 
     loaders = {
@@ -161,12 +280,18 @@ def create_lstm_dataloaders(config: dict, dataset: datasets.DatasetDict) -> tupl
         for split, ds in data.items()
     }
 
-    return loaders, vocab
+    flattened_train_labels = [tag for seq in train_tag_ids for tag in seq if tag != ignore_index]
+
+    return loaders, vocab, label2id, id2label, flattened_train_labels
 
 
-def class_weights_from_labels(labels: list[int], num_classes: int) -> torch.Tensor:
-    """Compute inverse-frequency class weights for imbalanced labels."""
-    counts = np.bincount(np.array(labels), minlength=num_classes)
+def class_weights_from_labels(labels: list[int], num_classes: int, ignore_index: int = -100) -> torch.Tensor:
+    """Compute inverse-frequency class weights while skipping ignored indices."""
+    effective = np.array([label for label in labels if label != ignore_index], dtype=np.int64)
+    if effective.size == 0:
+        return torch.ones(num_classes, dtype=torch.float)
+
+    counts = np.bincount(effective, minlength=num_classes)
     counts = np.maximum(counts, 1)
     weights = 1.0 / counts
     weights = weights / weights.sum() * num_classes

@@ -26,10 +26,7 @@ def main() -> None:
     logger = setup_logger("train_lstm")
 
     dataset = load_pubmed_rct20k(config)
-    label_feature = dataset["train"].features[config["dataset"]["label_column"]]
-    id2label = {i: name for i, name in enumerate(label_feature.names)}
-
-    dataloaders, vocab = create_lstm_dataloaders(config, dataset)
+    dataloaders, vocab, _label2id, id2label, train_token_labels = create_lstm_dataloaders(config, dataset)
 
     output_root = config["paths"]["artifacts_root"]
     metrics = train_lstm(
@@ -39,8 +36,9 @@ def main() -> None:
         pad_id=vocab.pad_id,
         num_classes=len(id2label),
         id2label=id2label,
+        vocab_itos=vocab.itos,
         output_dir=f"{output_root}/lstm",
-        train_labels=list(dataset["train"][config["dataset"]["label_column"]]),
+        train_labels=train_token_labels,
     )
     logger.info("LSTM test metrics: %s", metrics)
 

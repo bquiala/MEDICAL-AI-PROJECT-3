@@ -26,14 +26,11 @@ def main() -> None:
     logger = setup_logger("train_transformer")
 
     dataset = load_pubmed_rct20k(config)
-    label_feature = dataset["train"].features[config["dataset"]["label_column"]]
-    id2label = {i: name for i, name in enumerate(label_feature.names)}
 
     output_root = config["paths"]["artifacts_root"]
     metrics = train_transformer(
         config=config,
         dataset=dataset,
-        id2label=id2label,
         output_dir=f"{output_root}/transformer",
     )
     logger.info("Transformer test metrics: %s", metrics)
