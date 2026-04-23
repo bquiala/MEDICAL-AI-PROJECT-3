@@ -1,0 +1,5 @@
+task,model,metric,value
+NER,BiLSTM,Entity F1,0.5522875816993464
+NER,Transformer,Entity F1,0.817391304347826
+Classification,BiLSTM,Macro F1,0.5312260015973962
+Classification,Transformer,Macro F1,0.7106060047370895
