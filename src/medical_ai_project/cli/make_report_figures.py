@@ -12,11 +12,20 @@ import seaborn as sns
 
 
 def _load_json(path: Path) -> dict:
+    """Load a JSON file from disk.
+
+    Args:
+        path: Path to the JSON file.
+
+    Returns:
+        Parsed JSON payload.
+    """
     with path.open("r", encoding="utf-8") as file:
         return json.load(file)
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse CLI arguments."""
     parser = argparse.ArgumentParser(description="Build report figures from saved metrics")
     parser.add_argument("--artifacts-root", type=str, default="artifacts", help="Artifacts root path")
     parser.add_argument("--output-dir", type=str, default="reports/figures", help="Figure output path")
@@ -24,6 +33,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Generate figures and summary CSVs from saved artifact metrics."""
     args = parse_args()
     artifacts_root = Path(args.artifacts_root)
     output_dir = Path(args.output_dir)

@@ -8,6 +8,14 @@ from medical_ai_project.evaluation.metrics import bio_tags_to_spans
 
 
 def _parse_tags(value: str) -> list[str]:
+    """Split a space-delimited tag string into a list.
+
+    Args:
+        value: Tag string (e.g., "O B-DISEASE I-DISEASE").
+
+    Returns:
+        List of tag tokens. Returns an empty list for None.
+    """
     return str(value).split() if value is not None else []
 
 

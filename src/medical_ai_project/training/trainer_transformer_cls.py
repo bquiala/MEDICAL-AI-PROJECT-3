@@ -35,6 +35,7 @@ def train_transformer_classification(config: dict, dataset, output_dir: str) -> 
     tokenizer = AutoTokenizer.from_pretrained(tr_cfg["model_name"])
 
     def preprocess(examples: dict) -> dict:
+        """Tokenize text examples and map labels to integer ids."""
         tokenized = tokenizer(
             examples[text_column],
             truncation=True,
@@ -90,6 +91,7 @@ def train_transformer_classification(config: dict, dataset, output_dir: str) -> 
     )
 
     def compute_metrics(eval_pred):
+        """Compute classification metrics from logits and labels."""
         logits, labels = eval_pred
         preds = np.argmax(logits, axis=1)
         return compute_classification_metrics(labels.tolist(), preds.tolist(), label_names=label_names)

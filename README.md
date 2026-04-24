@@ -4,6 +4,21 @@ Biomedical NLP project on PubMed RCT 20k with two tracks:
 1) weakly supervised Named Entity Recognition (NER), and
 2) sentence-level rhetorical role classification.
 
+## Project Overview
+
+This repository trains and evaluates baseline (BiLSTM) and transformer models to structure biomedical abstract text at two levels:
+
+- **Token-level**: extract weakly-supervised biomedical entities from text using BIO tagging.
+- **Sentence-level**: classify each sentence into a rhetorical role (e.g., Methods, Results).
+
+## Problem Statement
+
+Clinical and biomedical research workflows often need unstructured abstract text transformed into structured signals for downstream analysis (e.g., extracting key entities and separating Methods from Results). This project demonstrates an end-to-end, reproducible pipeline for:
+
+- building weak NER labels via a simple lexicon matching heuristic,
+- training/evaluating NER models on those weak labels, and
+- training/evaluating sentence classifiers on the dataset’s provided labels.
+
 ## Clinical Context
 
 This project is intended for biomedical NLP learners and clinical research teams who need both sentence-level evidence structuring and token-level entity extraction from biomedical text.
@@ -58,6 +73,12 @@ Expected runtime and compute:
 - Suggested minimum RAM: 8GB (16GB recommended)
 
 ## Usage Guide
+
+Note: the shell scripts set `PYTHONPATH` to include `src/` so `python -m medical_ai_project...` works from the repository root. If you run commands manually and see `ModuleNotFoundError`, run:
+
+```bash
+export PYTHONPATH="$(pwd)/src:${PYTHONPATH:-}"
+```
 
 ### NER: Train LSTM baseline
 
@@ -223,6 +244,7 @@ Experiments completed on PubMed RCT 20k dataset with both quick (subset) and ful
 ├── scripts/
 │   ├── run_full_pipeline.sh
 │   └── run_quick_pipeline.sh
+├── notebooks/                  # EDA + demo notebooks
 ├── src/
 │   └── medical_ai_project/
 │       ├── cli/                # Command-line entrypoints
@@ -236,6 +258,15 @@ Experiments completed on PubMed RCT 20k dataset with both quick (subset) and ful
 ├── requirements.txt
 └── README.md
 ```
+
+## Notebooks
+
+- **EDA**: `notebooks/01_eda_pubmed_rct20k.ipynb`
+	- Dataset overview, missingness, label/entity distributions, text length summaries, and visualizations.
+	- Includes interpretation sections that motivate preprocessing choices (e.g., max sequence length) and model selection.
+
+- **Demo**: `notebooks/02_demo_inference_and_evaluation.ipynb`
+	- Loads a trained model checkpoint (if present), runs inference on sample sentences, and visualizes performance from saved artifacts.
 
 ## Authors and Contributions
 

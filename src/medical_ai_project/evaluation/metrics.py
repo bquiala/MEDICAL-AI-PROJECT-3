@@ -10,6 +10,7 @@ from sklearn.metrics import (
     precision_recall_fscore_support,
 )
 
+
 def bio_tags_to_spans(tags: list[str]) -> list[dict]:
     """Convert BIO tags into entity spans with start/end token offsets."""
     spans: list[dict] = []
@@ -17,6 +18,7 @@ def bio_tags_to_spans(tags: list[str]) -> list[dict]:
     start_idx = None
 
     def close_span(end_idx: int) -> None:
+        """Finalize the currently active span (if any) at the given end index."""
         nonlocal active_type, start_idx
         if active_type is not None and start_idx is not None:
             spans.append(
@@ -52,6 +54,7 @@ def bio_tags_to_spans(tags: list[str]) -> list[dict]:
 
 
 def _safe_divide(numerator: float, denominator: float) -> float:
+    """Return numerator/denominator, guarding against divide-by-zero."""
     return float(numerator / denominator) if denominator else 0.0
 
 
@@ -203,6 +206,7 @@ def bootstrap_metric_ci(
     y_pred_arr = np.asarray(y_pred)
 
     def _score(indices: np.ndarray) -> float:
+        """Compute the requested metric on a bootstrap resample."""
         yt = y_true_arr[indices]
         yp = y_pred_arr[indices]
         if metric_name == "accuracy":

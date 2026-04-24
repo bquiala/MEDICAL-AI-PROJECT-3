@@ -139,6 +139,7 @@ def add_weak_ner_annotations(config: dict, dataset: datasets.DatasetDict) -> dat
     label2id, _ = make_ner_labels(entity_types)
 
     def annotate(example: dict) -> dict:
+        """Tokenize a single example and attach weak BIO tag annotations."""
         tokens = simple_tokenize(example[config["dataset"]["text_column"]])
         tags = annotate_bio_tags(tokens, entity_types)
         tag_ids = [label2id[tag] for tag in tags]
@@ -211,6 +212,15 @@ class LSTMSentenceDataset(Dataset):
         max_seq_len: int,
         ignore_index: int,
     ) -> None:
+        """Create a token-level dataset for NER.
+
+        Args:
+            token_sequences: Tokenized sentences.
+            tag_id_sequences: BIO tag id sequences aligned to tokens.
+            vocab: Vocabulary mapping for token ids.
+            max_seq_len: Maximum sequence length (tokens) per example.
+            ignore_index: Label id used for padding positions.
+        """
         self.token_sequences = token_sequences
         self.tag_id_sequences = tag_id_sequences
         self.vocab = vocab
@@ -218,9 +228,11 @@ class LSTMSentenceDataset(Dataset):
         self.ignore_index = ignore_index
 
     def __len__(self) -> int:
+        """Return number of examples."""
         return len(self.token_sequences)
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Return encoded inputs, labels, and attention mask for one example."""
         tokens = self.token_sequences[index]
         tag_ids = self.tag_id_sequences[index]
 
@@ -245,15 +257,18 @@ class LSTMTextClassificationDataset(Dataset):
     """Torch dataset for sentence-level text classification."""
 
     def __init__(self, texts: list[str], labels: list[int], vocab: Vocab, max_seq_len: int) -> None:
+        """Create a classification dataset with fixed-length token id sequences."""
         self.texts = texts
         self.labels = labels
         self.vocab = vocab
         self.max_seq_len = max_seq_len
 
     def __len__(self) -> int:
+        """Return number of examples."""
         return len(self.texts)
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Return encoded inputs, label id, and attention mask for one example."""
         token_ids = encode_sentence(self.texts[index], self.vocab, self.max_seq_len)
         attention_mask = [1 if token_id != self.vocab.pad_id else 0 for token_id in token_ids]
         return (
@@ -353,6 +368,7 @@ def create_lstm_classification_dataloaders(
     test_texts = list(dataset["test"][text_column])
 
     def normalize_labels(values: list) -> list[int]:
+        """Normalize labels to integer ids regardless of feature type."""
         normalized = []
         for value in values:
             if isinstance(value, str):

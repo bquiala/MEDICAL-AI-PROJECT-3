@@ -39,6 +39,7 @@ def train_transformer(
     tokenizer = AutoTokenizer.from_pretrained(tr_cfg["model_name"])
 
     def tokenize_fn(examples: dict) -> dict:
+        """Tokenize pre-split tokens and align word-level tags to subword tokens."""
         tokenized = tokenizer(
             examples["tokens"],
             truncation=True,
@@ -107,6 +108,7 @@ def train_transformer(
     )
 
     def compute_metrics(eval_pred):
+        """Compute NER metrics from transformer logits and aligned labels."""
         logits, labels = eval_pred
         preds = np.argmax(logits, axis=2)
 
